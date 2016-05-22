@@ -4,25 +4,12 @@
 #include <string.h>
 #include "varsync.h"
 #include "bsock.h"
-/*
-#define ROLE_SERVER 	1
-#define ROLE_CLIENT 	2 
-#define ROLE_SENDER 	4
-#define ROLE_RECEIVER	8
 
-struct variable_handler{
-	void * var_ptr;
-	size_t var_size;
-	struct variable_handler * next;
-};
+/* * * * * * * * * * * * * * * * * * * * * * * ||
+ * * * |  UTILITY FUNCTIONS            | * * * ||
+ * * * * * * * * * * * * * * * * * * * * * * * || */
 
-struct sync_list{
-	struct variable_handler * head;
-	uint8_t role;
-};
-
-*/
-
+/* Prints the buffer out */
 int pb(uint8_t *buff, size_t sz){
 	size_t i,j;
 	for( i = 0; i < sz; ++i){
@@ -48,7 +35,6 @@ int pb(uint8_t *buff, size_t sz){
 		
 	printf("\n");
 }
-
 
 int  setbit( int input, int bit, int value){
 	unsigned int mask = 1;
@@ -81,6 +67,8 @@ int  getbit( int input, int bit, int value){
 /* * * * * * * * * * * * * * * * * * * * * * * ||
  * * * |  LIST FUNCTIONS               | * * * ||
  * * * * * * * * * * * * * * * * * * * * * * * || */
+
+/* Initialize the list + wait for connection */
 struct sync_list* init_list(uint8_t role, const char * ip, unsigned int port){
 	struct sync_list* list = (struct sync_list*) malloc( sizeof( struct sync_list));
 	if( !list ){
@@ -108,6 +96,7 @@ struct sync_list* init_list(uint8_t role, const char * ip, unsigned int port){
 	return list;
 }
 
+/* Add a handler to the list*/
 int add_var_handler(struct sync_list * list, struct variable_handler* handle){
 	struct variable_handler* current = list->head;
 	struct variable_handler* prev;
@@ -126,16 +115,18 @@ int add_var_handler(struct sync_list * list, struct variable_handler* handle){
 	return 1;
 }
 
+/* decode sent handler from buffer */
 struct variable_handler * decode_var(size_t buffer_size, void * in_buffer){
 	struct variable_handler * var = malloc(sizeof(struct variable_handler));
 	struct variable_handler * in_var = (struct variable_handler *)in_buffer;
 	void * newbuff;
+
 	if(!var) return NULL;
 
 	memcpy( &(var->id), &(in_var->id), 4);
 	memcpy( &(var->var_size), &(in_var->var_size), 4);
 
-	if( buffer_size != var->var_size + 8 ){
+	if( buffer_size != var->var_size + HEADER_METADATA_SIZE ){
 		fprintf( stderr, "Packet size does not match var_size\n");
 	       	return NULL;
 	}
@@ -146,29 +137,34 @@ struct variable_handler * decode_var(size_t buffer_size, void * in_buffer){
 	       	return NULL;
 	}
 
-	memcpy( newbuff, in_buffer +8, var->var_size);
+	memcpy( newbuff, in_buffer + HEADER_METADATA_SIZE, var->var_size);
 	
 	var->var_ptr = newbuff;
 	return var;
 }
 
+/* Encode a variable to be sent onto a buffer */
 size_t encode_var(struct variable_handler * var, void ** out_buffer){
-	const size_t calc_size =( sizeof(uint32_t) * 2) + var->var_size;
+	const size_t calc_size =  var->var_size + HEADER_METADATA_SIZE;
 	uint8_t * buffer = malloc(calc_size);
-	
-	((struct variable_handler *)buffer)->id = var->id;
-	((struct variable_handler *)buffer)->var_size = var->var_size;
-	memcpy(buffer + (sizeof(uint32_t) * 2), var->var_ptr, var->var_size);
+	struct variable_handler * out_var = (struct variable_handler *) buffer;
+	 
+	out_var->id = var->id;
+	out_var->var_size = var->var_size;
+
+	memcpy(&(out_var->var_ptr), var->var_ptr, var->var_size);
 
 	*out_buffer = buffer; 
 	return calc_size;
 }
 
+/*  based on the roles, send or receive updates */
 void* update_thread(void * list_p){
 	struct sync_list* list = (struct sync_list *) list_p;
 	struct variable_handler* current = list->head;
-	uint8_t * packet_buff; 
 	size_t txBytes, rxBytes;
+	uint8_t * packet_buff; 
+
 	txBytes = rxBytes = 0;
 
 	while( 1 ){
@@ -198,7 +194,6 @@ void* update_thread(void * list_p){
 			else
 				txBytes += sz;
 			
-
 			free(packet_buff);
 		}
 		else{ 		// Receiver
@@ -215,7 +210,6 @@ void* update_thread(void * list_p){
 			else
 				rxBytes += sz;
 		
-			
 			temp_var = decode_var( sz, buffer);
 			
 			if( !temp_var ){
@@ -231,6 +225,35 @@ void* update_thread(void * list_p){
 	}
 }
 
+/* Print the list out to json */
+void print_json( struct sync_list* list){
+	struct variable_handler* current = list->head;
+	
+	if( current == NULL) 
+		return;
+
+	do {
+		printf("{ \"id\" : %u, ", current->id);
+		printf(" \"sz\" : %u, ", current->var_size);
+
+		if( current->var_size <= 4){
+			printf("\"val\": %d", *((int32_t *) current->var_ptr));
+
+		}
+		else{
+			int i; 
+			printf("\"val\": \"");
+			for( i = 0; i < current->var_size; ++i)
+				printf( "%02x", *((int8_t *)(current->var_ptr + i)));
+			printf("\"");
+		}
+		
+		printf("}\n");
+		current = current->next;
+	}while( current );
+}
+
+/* Search for the var in the list. If it exists, update the value. Otherwise, add it. */
 int insert_or_update( struct sync_list* list, struct variable_handler * temp_var){
 	struct variable_handler* current = list->head;
 	struct variable_handler* prev;
@@ -255,6 +278,7 @@ int insert_or_update( struct sync_list* list, struct variable_handler * temp_var
 	return 1;
 }
 
+/* Deinit the whole list */ 
 void deinit_list(struct sync_list* list){
 	struct variable_handler* current = list->head;
 	struct variable_handler* next;
@@ -265,6 +289,7 @@ void deinit_list(struct sync_list* list){
 	}
 }
 
+/* Get the tail of the list */
 struct variable_handler* get_tail( void * list_p){
 	struct sync_list* list = (struct sync_list*)list_p;
 	struct variable_handler* current = list->head;

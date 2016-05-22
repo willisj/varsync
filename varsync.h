@@ -7,6 +7,8 @@
 #define VSROLE_RECEIVER	2,0
 #define MAX_PACKETSIZE 1024
 
+
+#define HEADER_METADATA_SIZE	8	// id and var_size 
 struct __attribute__((__packed__)) variable_handler{
 	uint32_t id; 
 	uint32_t var_size;
@@ -25,3 +27,4 @@ struct sync_list* init_list(uint8_t role, const char * ip, unsigned int port);
 int add_var_handler(  struct sync_list * list, struct variable_handler* handle);
 void * update_thread(void* list);
 void deinit_list(struct sync_list*);
+void print_json( struct sync_list*);

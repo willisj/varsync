@@ -12,7 +12,9 @@ int main(int argv, char * argc[]){
 	uint8_t role 			 = 0;
 	uint32_t example_variable	 = 0;
 	struct sync_list * list		 = NULL;
-	struct variable_handler * handle = NULL;
+	char  example_buffer[] = "this is some sample data for the buffer";
+	struct variable_handler * variable_handle = NULL;
+	struct variable_handler * buffer_handle = NULL;
 	pthread_t thread_handler;
 
 	if( argv == 3 ){
@@ -49,15 +51,26 @@ int main(int argv, char * argc[]){
 
 	
 	fprintf( stderr, "Initializing variable\n");
-	handle = init_variable_handler( EXAMPLE_ID, &example_variable, sizeof(uint32_t), NULL);
-	if(!handle){
+	variable_handle = init_variable_handler( EXAMPLE_ID, &example_variable, sizeof(uint32_t), NULL);
+	if(!variable_handle){
 		fprintf( stderr, "\t\t[Failed]\n");
 		exit(1);
+	}
+	buffer_handle = init_variable_handler( EXAMPLE_ID + 1, example_buffer, strlen(example_buffer), NULL);
+	if(!buffer_handle){
+		fprintf( stderr, "\t\t[Failed]\n");
+		exit(1);
+
 	}
 	fprintf( stderr, "\t\t[Done]\n");
 
 	fprintf( stderr, "Adding variable to list\n");
-	if(!add_var_handler( list, handle) ){
+	if(!add_var_handler( list, variable_handle) ){
+		fprintf( stderr, "\t\t[Failed]\n");
+		fprintf( stderr, "Unable to add handler to  list\n");
+		return 1;
+	}
+	if(!add_var_handler( list, buffer_handle) ){
 		fprintf( stderr, "\t\t[Failed]\n");
 		fprintf( stderr, "Unable to add handler to  list\n");
 		return 1;
@@ -75,7 +88,7 @@ int main(int argv, char * argc[]){
 		if( getbit( role, VSROLE_SENDER))
 			printf("Var: %d\n", example_variable++);
 		else
-			printf("Var: %d\n", example_variable);
+			print_json(   list);
 		sleep(1);
 	}
 
