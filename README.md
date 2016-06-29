@@ -1,12 +1,8 @@
-# varsync
 
-Example output
+# Example output
 
-=====================
-|||   WINDOW 1
-|||
-=====================
-
+## Window 1
+```
 @raspberrypi ~/Documents/varsync $ ./bin/varsync-test server send                                                                                                                   
 Initializing list                                                                                                                                                                   
 Waiting for connection                                                                                                                                                              
@@ -33,13 +29,11 @@ Var: 12
 Var: 13                                                                                                                                                                             
 Var: 14                                                                                                                                                                             
 Var: 15                                                                                                                                                                             
-Var: 16                                                 
+Var: 16                                                
+```
 
-=====================
-|||   WINDOW 2 
-|||
-=====================
-
+##   WINDOW 2 
+```
 pi@raspberrypi ~/Documents/varsync $ ./bin/varsync-test client recv
 Initializing list
                 [Done]
@@ -87,3 +81,4 @@ Creating thread
 { "id" : 2,  "sz" : 39, "val": "7468697320697320736f6d652073616d706c65206461746120666f722074686520627566666572"}
 { "id" : 1,  "sz" : 4, "val": 17}
 { "id" : 2,  "sz" : 39, "val": "7468697320697320736f6d652073616d706c65206461746120666f722074686520627566666572"}
+```
